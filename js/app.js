@@ -510,7 +510,6 @@ async function editBook(bookId) {
 function showAddBook() {
   showScreen('screen-add-book');
   document.getElementById('photo-preview').classList.add('hidden');
-  // Clear previous input
   document.getElementById('input-book-name').value = '';
 }
 
@@ -521,16 +520,119 @@ async function saveBookManual() {
   document.getElementById('input-book-name').value = '';
 }
 
-function previewPhoto(file) {
+// ============================================================
+// Photo OCR via ocr.space (free, supports Chinese)
+// ============================================================
+function handlePhotoInput(file) {
   if (!file) return;
   const previewEl = document.getElementById('photo-preview');
   const imgEl = document.getElementById('preview-img');
+  const statusEl = document.getElementById('ocr-status');
+  const inputEl = document.getElementById('input-book-name');
+
+  previewEl.classList.remove('hidden');
+  statusEl.textContent = '正在处理图片...';
+
   const reader = new FileReader();
-  reader.onload = function(e) {
-    imgEl.src = e.target.result;
-    previewEl.classList.remove('hidden');
+  reader.onload = async function(e) {
+    const dataUrl = e.target.result;
+    imgEl.src = dataUrl;
+
+    // Preprocess for better OCR
+    const processed = await preprocessImageForOCR(dataUrl);
+
+    statusEl.textContent = '正在识别文字...';
+
+    try {
+      const result = await callOCRApi(processed);
+      if (result) {
+        inputEl.value = result;
+        statusEl.textContent = '✅ 识别完成，请确认后点击"记录这本书"';
+      } else {
+        statusEl.textContent = '未识别到文字，请手动输入书名';
+      }
+    } catch (err) {
+      console.warn('OCR failed:', err);
+      statusEl.textContent = '识别失败，请手动输入书名';
+    }
   };
   reader.readAsDataURL(file);
+}
+
+function preprocessImageForOCR(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      // Scale up small images for better OCR
+      const scale = img.width < 800 ? 2 : 1;
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Light contrast boost
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i]   = Math.min(255, Math.max(0, ((d[i]   - 128) * 1.4) + 128));
+        d[i+1] = Math.min(255, Math.max(0, ((d[i+1] - 128) * 1.4) + 128));
+        d[i+2] = Math.min(255, Math.max(0, ((d[i+2] - 128) * 1.4) + 128));
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = dataUrl;
+  });
+}
+
+async function callOCRApi(base64Image) {
+  const formData = new FormData();
+  formData.append('base64Image', base64Image);
+  formData.append('language', 'chs');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('OCREngine', '2');
+  formData.append('scale', 'true');
+  formData.append('isTable', 'false');
+
+  const resp = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    headers: { 'apikey': 'K85403655788957' },
+    body: formData,
+  });
+
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+  const data = await resp.json();
+  if (data.IsErroredOnProcessing) throw new Error(data.ErrorMessage);
+
+  const results = data.ParsedResults;
+  if (!results || results.length === 0) return '';
+
+  const allText = results.map(r => r.ParsedText || '').join('\n');
+  return extractBestTitle(allText);
+}
+
+function extractBestTitle(text) {
+  const lines = text.split(/[\n\r]+/)
+    .map(l => l.trim().replace(/\s+/g, ''))
+    .filter(l => l.length >= 2);
+
+  if (lines.length === 0) return '';
+
+  // Score: prefer Chinese chars, reasonable title length
+  const scored = lines.map(l => {
+    let score = 0;
+    const chinese = (l.match(/[一-鿿]/g) || []).length;
+    score += chinese * 8;
+    if (l.length >= 2 && l.length <= 15) score += 30;
+    else if (l.length <= 25) score += 10;
+    // Penalize lines that are mostly non-text
+    if (/^[A-Za-z0-9\s\W]+$/.test(l) && chinese === 0) score -= 10;
+    return { text: l, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].text;
 }
 
 async function saveBook(name) {

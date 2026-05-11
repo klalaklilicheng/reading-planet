@@ -966,10 +966,13 @@ h3 {
   border: 2px solid var(--user-color);
   border-radius: 14px;
   color: var(--text);
-  font-size: 1.15rem;
+  font-size: 16px;
   outline: none;
   margin-bottom: 12px;
   -webkit-appearance: none;
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: var(--user-color);
 }
 
 .manual-input-main input:focus {
@@ -1022,6 +1025,7 @@ h3 {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-top: 4px;
+  min-height: 1.2em;
 }
 
 /* User card delete button */

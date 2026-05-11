@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="阅读星球">
@@ -126,16 +126,16 @@
           <button class="btn btn-primary" onclick="saveBookManual()">✅ 记录这本书</button>
         </div>
 
-        <!-- Camera helper: take photo to read the title yourself -->
+        <!-- Camera: take photo to recognize text -->
         <div class="camera-helper">
           <input type="file" id="camera-file-input" accept="image/*" capture="environment"
-                 class="hidden" onchange="previewPhoto(this.files[0]); this.value='';">
+                 class="hidden" onchange="handlePhotoInput(this.files[0]); this.value='';">
           <div class="option-card-small" onclick="document.getElementById('camera-file-input').click()">
-            <span>📷</span> 拍照参考
+            <span>📷</span> 拍照识别书名
           </div>
           <div id="photo-preview" class="hidden">
             <img id="preview-img" alt="book cover">
-            <p class="photo-hint">看看封面，把书名输入上方输入框</p>
+            <p id="ocr-status" class="photo-hint"></p>
           </div>
         </div>
       </div>
