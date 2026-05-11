@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reading-tracker-v3';
+const CACHE_NAME = 'reading-tracker-v4';
 
 // Install - skip caching on first load, just activate
 self.addEventListener('install', event => {

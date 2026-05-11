@@ -543,17 +543,31 @@ function handlePhotoInput(file) {
 
     statusEl.textContent = '正在识别文字...';
 
+    var result = null;
     try {
-      const result = await callOCRApi(processed);
-      if (result) {
-        inputEl.value = result;
-        statusEl.textContent = '✅ 识别完成，请确认后点击"记录这本书"';
-      } else {
-        statusEl.textContent = '未识别到文字，请手动输入书名';
-      }
+      result = await callOCRApi(processed);
     } catch (err) {
-      console.warn('OCR failed:', err);
-      statusEl.textContent = '识别失败，请手动输入书名';
+      console.warn('ocr.space failed:', err);
+      if (typeof Tesseract !== 'undefined') {
+        statusEl.textContent = '在线识别失败，尝试本地识别...';
+        try {
+          var tResult = await Tesseract.recognize(processed, 'chi_sim+eng', {
+            logger: function(m) {
+              if (m.status === 'recognizing text')
+                statusEl.textContent = '本地识别中... ' + Math.round(m.progress * 100) + '%';
+            }
+          });
+          var text = tResult.data.text.trim();
+          if (text.length > 0) result = extractBestTitle(text);
+        } catch (e2) { console.warn('Tesseract fallback failed:', e2); }
+      }
+    }
+
+    if (result) {
+      inputEl.value = result;
+      statusEl.textContent = '✅ 识别完成，请确认后点击"记录这本书"';
+    } else {
+      statusEl.textContent = '未识别到文字，请手动输入书名';
     }
   };
   reader.readAsDataURL(file);
@@ -565,21 +579,26 @@ function preprocessImageForOCR(dataUrl) {
     img.onload = function() {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      // Scale up small images for better OCR
-      const scale = img.width < 800 ? 2 : 1;
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // Light contrast boost
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = imageData.data;
-      for (let i = 0; i < d.length; i += 4) {
+      let w = img.width, h = img.height;
+      const maxSize = 1200;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+      } else if (w < 600) {
+        var scale = 2; w *= scale; h *= scale;
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      var imageData = ctx.getImageData(0, 0, w, h);
+      var d = imageData.data;
+      for (var i = 0; i < d.length; i += 4) {
         d[i]   = Math.min(255, Math.max(0, ((d[i]   - 128) * 1.4) + 128));
         d[i+1] = Math.min(255, Math.max(0, ((d[i+1] - 128) * 1.4) + 128));
         d[i+2] = Math.min(255, Math.max(0, ((d[i+2] - 128) * 1.4) + 128));
       }
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      resolve(canvas.toDataURL('image/jpeg', 0.65));
     };
     img.src = dataUrl;
   });
@@ -594,16 +613,21 @@ async function callOCRApi(base64Image) {
   formData.append('scale', 'true');
   formData.append('isTable', 'false');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
   const resp = await fetch('https://api.ocr.space/parse/image', {
     method: 'POST',
     headers: { 'apikey': 'K85403655788957' },
     body: formData,
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
   const data = await resp.json();
-  if (data.IsErroredOnProcessing) throw new Error(data.ErrorMessage);
+  if (data.IsErroredOnProcessing) throw new Error(data.ErrorMessage || 'OCR error');
 
   const results = data.ParsedResults;
   if (!results || results.length === 0) return '';
@@ -980,4 +1004,18 @@ if ('serviceWorker' in navigator) {
 // ============================================================
 // Init
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => { loadUsers(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadUsers();
+
+  // iOS PWA standalone: tapping an input doesn't open the keyboard because
+  // WebKit skips hit-testing on elements that were visibility:hidden.
+  // Calling focus() inside a touchend user-gesture works around it.
+  if (navigator.standalone) {
+    document.addEventListener('touchend', function(e) {
+      var el = e.target;
+      if (el.tagName === 'INPUT' && el.type !== 'file' && !el.readOnly) {
+        el.focus();
+      }
+    });
+  }
+});
