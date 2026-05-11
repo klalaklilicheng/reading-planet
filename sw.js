@@ -1,17 +1,7 @@
-const CACHE_NAME = 'reading-tracker-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
-  '/manifest.json'
-];
+const CACHE_NAME = 'reading-tracker-v2';
 
-// Install - cache core assets
+// Install - skip caching on first load, just activate
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
   self.skipWaiting();
 });
 
@@ -25,19 +15,20 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch - network first, fallback to cache
+// Fetch - network first, no aggressive caching
 self.addEventListener('fetch', event => {
-  // Skip non-GET and Firebase/external requests
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('firebasestorage') ||
-      event.request.url.includes('firebaseio') ||
-      event.request.url.includes('googleapis')) return;
+  // Skip external requests (Firebase, CDN, etc.)
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        // Only cache successful responses
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
