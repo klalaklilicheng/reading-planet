@@ -1,0 +1,571 @@
+:root {
+  --primary: #6366f1;
+  --primary-light: #a5b4fc;
+  --bg: #0f0f23;
+  --surface: #1a1a2e;
+  --surface-2: #252540;
+  --text: #f1f1f4;
+  --text-muted: #9ca3af;
+  --radius: 16px;
+  --user-color: #6366f1;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.screen {
+  display: none;
+  min-height: 100dvh;
+  padding-top: calc(var(--safe-top) + 20px);
+  padding-bottom: calc(var(--safe-bottom) + 20px);
+}
+
+.screen.active {
+  display: block;
+}
+
+.container {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Typography */
+.app-title {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+}
+
+h3 {
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  color: var(--text-muted);
+}
+
+/* Buttons */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--user-color);
+  color: white;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px dashed var(--text-muted);
+  color: var(--text-muted);
+  margin-top: 16px;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+/* User Grid */
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.user-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.user-card:active {
+  transform: scale(0.95);
+}
+
+.user-card .avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.user-card .name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.user-card .count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Color Picker */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.color-option {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.color-option.selected {
+  border-color: white;
+  transform: scale(1.15);
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+}
+
+.form-group input:focus {
+  border-color: var(--user-color);
+}
+
+/* Dashboard */
+.dash-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.dash-header h2 {
+  flex: 1;
+  margin-bottom: 0;
+  font-size: 1.3rem;
+}
+
+.book-count {
+  background: var(--user-color);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Progress Ring */
+.progress-section {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.progress-ring-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto;
+}
+
+.progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 12;
+}
+
+.progress-ring-fill {
+  fill: none;
+  stroke: var(--user-color);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 534;
+  stroke-dashoffset: 534;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.progress-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-center #progress-number {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--user-color);
+}
+
+.progress-center .progress-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.milestone-text {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Today Books */
+.snapshot-section {
+  margin-bottom: 32px;
+}
+
+.today-books-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scrollbar-width: none;
+}
+
+.today-books-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.today-book-card {
+  min-width: 120px;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.today-book-card .book-emoji {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.today-book-card .book-name {
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Book List */
+.book-list-section {
+  margin-bottom: 100px;
+}
+
+.book-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.book-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: 12px;
+}
+
+.book-item .book-number {
+  width: 28px;
+  height: 28px;
+  background: var(--user-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.book-item .book-info {
+  flex: 1;
+}
+
+.book-item .book-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.book-item .book-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 24px);
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--user-color);
+  color: white;
+  font-size: 2rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 100;
+}
+
+.fab:active {
+  transform: scale(0.9);
+}
+
+/* Add Book Options */
+.add-book-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.option-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.option-card:active {
+  transform: scale(0.95);
+  background: var(--surface-2);
+}
+
+.option-icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.option-card p {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.option-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Camera */
+.camera-preview-wrapper {
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: #000;
+}
+
+#camera-preview {
+  width: 100%;
+  display: block;
+}
+
+#captured-preview img {
+  width: 100%;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+
+#ocr-status {
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+#ocr-result input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.btn-capture {
+  background: white;
+  color: #000;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
+}
+
+/* Celebration */
+.celebration {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(8px);
+}
+
+.celebration.hidden {
+  display: none;
+}
+
+.celebration-content {
+  text-align: center;
+  padding: 40px;
+  animation: bounceIn 0.6s ease;
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+#celebration-icon {
+  font-size: 5rem;
+  margin-bottom: 16px;
+}
+
+.celebration-content h2 {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+  color: var(--user-color);
+}
+
+.celebration-content p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.celebration-content .btn {
+  width: auto;
+  display: inline-block;
+  padding: 14px 40px;
+}
+
+/* Hidden utility */
+.hidden {
+  display: none !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.book-item {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Stars background */
+.screen-users-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
