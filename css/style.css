@@ -861,6 +861,41 @@ h3 {
   100% { opacity: 0; transform: translateY(-60px) scale(0.3); }
 }
 
+/* Data Sync */
+.sync-section {
+  margin-top: 32px;
+  text-align: center;
+}
+
+.sync-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.sync-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-sync {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-2);
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sync:active {
+  transform: scale(0.95);
+  background: var(--surface-2);
+}
+
 /* Connection status */
 .connection-status {
   font-size: 0.75rem;

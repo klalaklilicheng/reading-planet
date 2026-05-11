@@ -719,6 +719,97 @@ function closeCelebration() {
 }
 
 // ============================================================
+// Data Import / Export
+// ============================================================
+async function exportData() {
+  // Gather all users and their books
+  const exportObj = { version: 1, exportedAt: new Date().toISOString(), users: [] };
+
+  for (const user of users) {
+    const userData = { ...user, books: [] };
+    // Try to load books from localStorage
+    const localBooks = JSON.parse(localStorage.getItem(`books_${user.id}`) || '[]');
+    userData.books = localBooks;
+    exportObj.users.push(userData);
+  }
+
+  const json = JSON.stringify(exportObj, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const date = new Date().toISOString().split('T')[0];
+  a.download = `阅读星球_数据备份_${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📤 数据已导出');
+}
+
+function triggerImport() {
+  document.getElementById('import-file-input').click();
+}
+
+async function importData(file) {
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data.users || !Array.isArray(data.users)) {
+      alert('数据格式不正确');
+      return;
+    }
+
+    const confirmed = await showConfirm({
+      icon: '📥',
+      title: '导入数据',
+      message: `将导入 ${data.users.length} 个成员的数据。已有同名成员的数据将被合并。确定继续？`,
+      confirmText: '导入',
+      danger: false
+    });
+    if (!confirmed) return;
+
+    let importedCount = 0;
+
+    for (const impUser of data.users) {
+      // Check if user already exists (by name)
+      const existing = users.find(u => u.name === impUser.name);
+
+      if (existing) {
+        // Merge books - avoid duplicates by createdAt
+        const existingBooks = JSON.parse(localStorage.getItem(`books_${existing.id}`) || '[]');
+        const existingDates = new Set(existingBooks.map(b => b.createdAt));
+        const newBooks = (impUser.books || []).filter(b => !existingDates.has(b.createdAt));
+        const merged = [...newBooks, ...existingBooks].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        localStorage.setItem(`books_${existing.id}`, JSON.stringify(merged));
+        existing.bookCount = merged.length;
+      } else {
+        // Create new user
+        const newId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const userData = {
+          id: newId,
+          name: impUser.name,
+          color: impUser.color || USER_COLORS[users.length % USER_COLORS.length],
+          bookCount: (impUser.books || []).length,
+          createdAt: impUser.createdAt || new Date().toISOString()
+        };
+        users.push(userData);
+        localStorage.setItem(`books_${newId}`, JSON.stringify(impUser.books || []));
+        importedCount++;
+      }
+    }
+
+    localStorage.setItem('reading_users', JSON.stringify(users));
+    renderUsers();
+    showToast(`✅ 导入完成！新增 ${importedCount} 个成员`);
+  } catch (e) {
+    console.error('Import error:', e);
+    alert('导入失败：' + e.message);
+  }
+}
+
+// ============================================================
 // Service Worker
 // ============================================================
 if ('serviceWorker' in navigator) {

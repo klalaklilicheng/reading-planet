@@ -21,6 +21,16 @@
         <p class="subtitle">选择你的星球</p>
         <div id="user-list" class="user-grid"></div>
         <button id="btn-add-user" class="btn btn-outline" onclick="showAddUser()">+ 添加新成员</button>
+
+        <!-- Data Sync -->
+        <div class="sync-section">
+          <p class="sync-label">数据同步</p>
+          <div class="sync-buttons">
+            <button class="btn btn-sync" onclick="exportData()">📤 导出数据</button>
+            <button class="btn btn-sync" onclick="triggerImport()">📥 导入数据</button>
+            <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="importData(this.files[0]); this.value='';">
+          </div>
+        </div>
       </div>
     </div>
 
