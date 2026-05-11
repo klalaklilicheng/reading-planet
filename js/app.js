@@ -20,7 +20,7 @@ const db = firebase.firestore();
 // Connection State
 // ============================================================
 let firebaseReady = false;
-(async function checkFirebase() {
+const firebaseReadyPromise = (async function checkFirebase() {
   try {
     await db.collection('_connectivity_test').doc('ping').set({ t: Date.now() });
     await db.collection('_connectivity_test').doc('ping').delete();
@@ -29,6 +29,51 @@ let firebaseReady = false;
     firebaseReady = false;
   }
 })();
+
+async function syncLocalDataToCloud() {
+  if (!firebaseReady) return;
+  var localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
+  var changed = false;
+
+  for (var i = 0; i < localUsers.length; i++) {
+    var user = localUsers[i];
+
+    if (user.id.startsWith('local_')) {
+      var oldId = user.id;
+      try {
+        var uData = { name: user.name, color: user.color, bookCount: user.bookCount || 0, createdAt: user.createdAt };
+        var uRef = await db.collection('users').add(uData);
+        user.id = uRef.id;
+
+        var localBooks = JSON.parse(localStorage.getItem('books_' + oldId) || '[]');
+        for (var j = 0; j < localBooks.length; j++) {
+          var bData = { name: localBooks[j].name, createdAt: localBooks[j].createdAt };
+          var bRef = await uRef.collection('books').add(bData);
+          localBooks[j].id = bRef.id;
+        }
+        localStorage.setItem('books_' + uRef.id, JSON.stringify(localBooks));
+        localStorage.removeItem('books_' + oldId);
+        changed = true;
+      } catch (e) { console.warn('Sync user failed:', user.name, e); }
+    } else {
+      var books2 = JSON.parse(localStorage.getItem('books_' + user.id) || '[]');
+      var bChanged = false;
+      for (var k = 0; k < books2.length; k++) {
+        if (books2[k].id && books2[k].id.startsWith('local_')) {
+          try {
+            var bd = { name: books2[k].name, createdAt: books2[k].createdAt };
+            var br = await db.collection('users').doc(user.id).collection('books').add(bd);
+            books2[k].id = br.id;
+            bChanged = true;
+          } catch (e) { console.warn('Sync book failed:', books2[k].name, e); }
+        }
+      }
+      if (bChanged) localStorage.setItem('books_' + user.id, JSON.stringify(books2));
+    }
+  }
+
+  if (changed) localStorage.setItem('reading_users', JSON.stringify(localUsers));
+}
 
 // ============================================================
 // Audio Unlock (iOS requires user gesture before AudioContext)
@@ -178,17 +223,33 @@ function showScreen(screenId) {
 // User Management
 // ============================================================
 async function loadUsers() {
+  // Show local data immediately so UI isn't blank during Firebase check
+  users = JSON.parse(localStorage.getItem('reading_users') || '[]');
+  renderUsers();
+
+  // Wait for Firebase connectivity check, then sync & reload from cloud
+  await firebaseReadyPromise;
   if (firebaseReady) {
+    await syncLocalDataToCloud();
     try {
       const snapshot = await db.collection('users').orderBy('createdAt').get();
       users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       localStorage.setItem('reading_users', JSON.stringify(users));
+      // Update currentUser reference if they're already on the dashboard
+      if (currentUser) {
+        var oldId = currentUser.id;
+        var updated = users.find(u => u.name === currentUser.name);
+        if (updated) {
+          currentUser = updated;
+          if (updated.id !== oldId) {
+            await loadBooks();
+            renderDashboard();
+          }
+        }
+      }
       renderUsers();
-      return;
     } catch (e) { firebaseReady = false; }
   }
-  users = JSON.parse(localStorage.getItem('reading_users') || '[]');
-  renderUsers();
 }
 
 function renderUsers() {
