@@ -861,6 +861,25 @@ h3 {
   100% { opacity: 0; transform: translateY(-60px) scale(0.3); }
 }
 
+/* Connection status */
+.connection-status {
+  font-size: 0.75rem;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.connection-status.online {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.connection-status.offline {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
 /* User card delete button */
 .user-card {
   position: relative;

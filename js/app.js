@@ -18,6 +18,24 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 // ============================================================
+// Connection State
+// ============================================================
+let firebaseReady = false;
+
+// Test Firestore connectivity on startup
+(async function checkFirebase() {
+  try {
+    await db.collection('_connectivity_test').doc('ping').set({ t: Date.now() });
+    await db.collection('_connectivity_test').doc('ping').delete();
+    firebaseReady = true;
+    console.log('Firebase connected');
+  } catch (e) {
+    firebaseReady = false;
+    console.warn('Firebase unreachable, using localStorage only:', e.message);
+  }
+})();
+
+// ============================================================
 // State
 // ============================================================
 let currentUser = null;
@@ -148,15 +166,23 @@ function showScreen(screenId) {
 // User Management
 // ============================================================
 async function loadUsers() {
-  try {
-    const snapshot = await db.collection('users').orderBy('createdAt').get();
-    users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    renderUsers();
-  } catch (e) {
-    console.error('Load users failed:', e);
-    users = JSON.parse(localStorage.getItem('reading_users') || '[]');
-    renderUsers();
+  // Try Firebase first, fall back to localStorage
+  if (firebaseReady) {
+    try {
+      const snapshot = await db.collection('users').orderBy('createdAt').get();
+      users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sync to localStorage as backup
+      localStorage.setItem('reading_users', JSON.stringify(users));
+      renderUsers();
+      return;
+    } catch (e) {
+      console.error('Firebase load failed, using local:', e);
+      firebaseReady = false;
+    }
   }
+  // localStorage fallback
+  users = JSON.parse(localStorage.getItem('reading_users') || '[]');
+  renderUsers();
 }
 
 function renderUsers() {
@@ -209,17 +235,22 @@ async function createUser() {
     createdAt: new Date().toISOString()
   };
 
-  try {
-    const ref = await db.collection('users').add(userData);
-    userData.id = ref.id;
-  } catch (e) {
+  if (firebaseReady) {
+    try {
+      const ref = await db.collection('users').add(userData);
+      userData.id = ref.id;
+    } catch (e) {
+      console.error('Firebase create failed:', e);
+      userData.id = 'local_' + Date.now();
+    }
+  } else {
     userData.id = 'local_' + Date.now();
-    const localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
-    localUsers.push(userData);
-    localStorage.setItem('reading_users', JSON.stringify(localUsers));
   }
 
+  // Always save to localStorage
   users.push(userData);
+  localStorage.setItem('reading_users', JSON.stringify(users));
+
   document.getElementById('input-username').value = '';
   showScreen('screen-users');
   renderUsers();
@@ -245,16 +276,19 @@ async function deleteUser(userId, userName) {
   });
   if (!confirmed) return;
 
-  try {
-    const booksSnap = await db.collection('users').doc(userId).collection('books').get();
-    const batch = db.batch();
-    booksSnap.docs.forEach(doc => batch.delete(doc.ref));
-    batch.delete(db.collection('users').doc(userId));
-    await batch.commit();
-  } catch (e) {
-    console.error('Firestore delete failed:', e);
+  if (firebaseReady) {
+    try {
+      const booksSnap = await db.collection('users').doc(userId).collection('books').get();
+      const batch = db.batch();
+      booksSnap.docs.forEach(doc => batch.delete(doc.ref));
+      batch.delete(db.collection('users').doc(userId));
+      await batch.commit();
+    } catch (e) {
+      console.error('Firestore delete failed:', e);
+    }
   }
 
+  // Always clean localStorage
   users = users.filter(u => u.id !== userId);
   localStorage.removeItem(`books_${userId}`);
   const localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
@@ -269,14 +303,19 @@ async function deleteUser(userId, userName) {
 // Book Management
 // ============================================================
 async function loadBooks() {
-  try {
-    const snapshot = await db.collection('users').doc(currentUser.id)
-      .collection('books').orderBy('createdAt', 'desc').get();
-    books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (e) {
-    console.error('Load books failed:', e);
-    books = JSON.parse(localStorage.getItem(`books_${currentUser.id}`) || '[]');
+  if (firebaseReady) {
+    try {
+      const snapshot = await db.collection('users').doc(currentUser.id)
+        .collection('books').orderBy('createdAt', 'desc').get();
+      books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sync to localStorage as backup
+      localStorage.setItem(`books_${currentUser.id}`, JSON.stringify(books));
+      return;
+    } catch (e) {
+      console.error('Firebase load books failed:', e);
+    }
   }
+  books = JSON.parse(localStorage.getItem(`books_${currentUser.id}`) || '[]');
 }
 
 function renderDashboard() {
@@ -284,6 +323,16 @@ function renderDashboard() {
   document.getElementById('dash-username').textContent = currentUser.name;
   document.getElementById('dash-count').textContent = `${count} 本`;
   document.getElementById('progress-number').textContent = count;
+
+  // Connection status
+  const statusEl = document.getElementById('connection-status');
+  if (firebaseReady) {
+    statusEl.className = 'connection-status online';
+    statusEl.textContent = '☁️ 云端同步中';
+  } else {
+    statusEl.className = 'connection-status offline';
+    statusEl.textContent = '📱 本地模式 · 数据仅保存在此设备';
+  }
 
   // Progress ring
   let target = count < 50 ? 50 : (count < 100 ? 100 : Math.ceil(count / 50) * 50);
@@ -448,21 +497,32 @@ async function saveBook(name) {
     createdAt: new Date().toISOString()
   };
 
-  try {
-    const ref = await db.collection('users').doc(currentUser.id)
-      .collection('books').add(bookData);
-    bookData.id = ref.id;
-    const newCount = books.length + 1;
-    await db.collection('users').doc(currentUser.id).update({ bookCount: newCount });
-    currentUser.bookCount = newCount;
-  } catch (e) {
+  if (firebaseReady) {
+    try {
+      const ref = await db.collection('users').doc(currentUser.id)
+        .collection('books').add(bookData);
+      bookData.id = ref.id;
+      const newCount = books.length + 1;
+      await db.collection('users').doc(currentUser.id).update({ bookCount: newCount });
+      currentUser.bookCount = newCount;
+    } catch (e) {
+      console.error('Firebase save failed:', e);
+      bookData.id = 'local_' + Date.now();
+    }
+  } else {
     bookData.id = 'local_' + Date.now();
-    const localBooks = JSON.parse(localStorage.getItem(`books_${currentUser.id}`) || '[]');
-    localBooks.unshift(bookData);
-    localStorage.setItem(`books_${currentUser.id}`, JSON.stringify(localBooks));
   }
 
+  // Always save to localStorage
   books.unshift(bookData);
+  localStorage.setItem(`books_${currentUser.id}`, JSON.stringify(books));
+  // Update user bookCount in localStorage
+  const localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
+  const localUser = localUsers.find(u => u.id === currentUser.id);
+  if (localUser) {
+    localUser.bookCount = books.length;
+    localStorage.setItem('reading_users', JSON.stringify(localUsers));
+  }
 
   // Celebration!
   launchMiniConfetti();
