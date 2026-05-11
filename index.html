@@ -10,6 +10,27 @@
   <link rel="apple-touch-icon" href="icons/icon-512.svg">
   <link rel="manifest" href="manifest.json">
   <title>阅读星球</title>
+  <script>
+  // Force clear old Service Worker caches when app version changes
+  (function(){
+    var APP_V = 5;
+    if (localStorage.getItem('_appV') !== String(APP_V)) {
+      localStorage.setItem('_appV', String(APP_V));
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          var p = regs.map(function(r){ return r.unregister(); });
+          return Promise.all(p);
+        }).then(function() {
+          return caches.keys();
+        }).then(function(keys) {
+          return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+        }).then(function() {
+          location.reload();
+        });
+      }
+    }
+  })();
+  </script>
   <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
