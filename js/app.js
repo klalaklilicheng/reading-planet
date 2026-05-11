@@ -515,12 +515,24 @@ function showAddBook() {
 }
 
 function showManualInput() {
-  document.getElementById('camera-section').classList.add('hidden');
-  document.getElementById('manual-section').classList.remove('hidden');
-  // iOS fix: defer focus to next frame
-  requestAnimationFrame(() => {
-    document.getElementById('input-book-name').focus();
-  });
+  // Hide camera section explicitly
+  document.getElementById('camera-section').style.display = 'none';
+  // Show manual section
+  const section = document.getElementById('manual-section');
+  section.style.display = 'block';
+  section.classList.remove('hidden');
+  const input = document.getElementById('input-book-name');
+  input.value = '';
+  // iOS: multiple fallback approaches for focus
+  input.blur(); // reset any existing focus state
+  setTimeout(() => {
+    input.focus();
+    // Force keyboard open on iOS
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      const evt = new Event('touchstart');
+      input.dispatchEvent(evt);
+    }
+  }, 400);
 }
 
 async function saveBookManual() {
@@ -539,22 +551,10 @@ async function saveBookFromOCR() {
 async function saveBook(name) {
   const bookData = { name, createdAt: new Date().toISOString() };
 
-  if (firebaseReady) {
-    try {
-      const ref = await db.collection('users').doc(currentUser.id)
-        .collection('books').add(bookData);
-      bookData.id = ref.id;
-      const newCount = books.length + 1;
-      await db.collection('users').doc(currentUser.id).update({ bookCount: newCount });
-      currentUser.bookCount = newCount;
-    } catch (e) {
-      bookData.id = 'local_' + Date.now();
-    }
-  } else {
-    bookData.id = 'local_' + Date.now();
-  }
+  // Local ID first so UI can update immediately
+  bookData.id = 'local_' + Date.now();
 
-  // Always update local
+  // Update local state IMMEDIATELY
   books.unshift(bookData);
   currentUser.bookCount = books.length;
   localStorage.setItem(`books_${currentUser.id}`, JSON.stringify(books));
@@ -562,17 +562,31 @@ async function saveBook(name) {
   const localUser = localUsers.find(u => u.id === currentUser.id);
   if (localUser) { localUser.bookCount = books.length; localStorage.setItem('reading_users', JSON.stringify(localUsers)); }
 
-  // Celebration!
+  // Show result immediately
   launchMiniConfetti();
   playBookAddedSound();
-
   const count = books.length;
   if (count === 50) setTimeout(() => showCelebration50(), 600);
   else if (count === 100) setTimeout(() => showCelebration100(), 600);
   else if ([10, 25, 75].includes(count)) showToast(`🎉 第 ${count} 本书！继续加油！`);
-
   showScreen('screen-dashboard');
   renderDashboard();
+
+  // Then sync to Firebase in background (non-blocking)
+  if (firebaseReady) {
+    try {
+      const ref = await db.collection('users').doc(currentUser.id)
+        .collection('books').add({ name, createdAt: bookData.createdAt });
+      // Update local ID with Firebase ID
+      bookData.id = ref.id;
+      const idx = books.findIndex(b => b.id === bookData.id || (b.name === name && b.createdAt === bookData.createdAt));
+      if (idx >= 0) books[idx].id = ref.id;
+      localStorage.setItem(`books_${currentUser.id}`, JSON.stringify(books));
+      await db.collection('users').doc(currentUser.id).update({ bookCount: books.length });
+    } catch (e) {
+      console.warn('Firebase sync failed:', e);
+    }
+  }
 }
 
 // ============================================================
@@ -609,28 +623,27 @@ function preprocessImage(dataUrl, callback) {
   img.onload = function() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    // Scale up for better OCR (2x)
+    // Scale up for better OCR
     canvas.width = img.width * 2;
     canvas.height = img.height * 2;
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Increase contrast and convert to grayscale
+    // Increase contrast gently (no binarization - keeps Chinese strokes)
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
-      // Convert to grayscale
-      const gray = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-      // Apply threshold for better text detection
-      const val = gray > 140 ? 255 : 0;
-      data[i] = val;
-      data[i+1] = val;
-      data[i+2] = val;
+      // Increase contrast: push each channel away from midpoint 128
+      data[i]   = clamp(((data[i]   - 128) * 1.5) + 128);
+      data[i+1] = clamp(((data[i+1] - 128) * 1.5) + 128);
+      data[i+2] = clamp(((data[i+2] - 128) * 1.5) + 128);
     }
     ctx.putImageData(imageData, 0, 0);
     callback(canvas.toDataURL('image/png'));
   };
   img.src = dataUrl;
 }
+
+function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
 
 async function runOCR(processedDataUrl) {
   const statusEl = document.getElementById('ocr-status');
@@ -671,20 +684,27 @@ async function runOCR(processedDataUrl) {
 }
 
 function extractBookName(ocrText) {
-  const lines = ocrText.split('\n').filter(l => l.trim().length > 0);
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length === 0) return '';
-  // Filter for reasonable title length, prefer Chinese characters
-  const candidates = lines.filter(l => {
-    const t = l.trim();
-    return t.length >= 2 && t.length <= 30;
+
+  // Score each line: prefer Chinese characters, reasonable length, no garbage
+  const scored = lines.map(l => {
+    let score = 0;
+    // Count Chinese characters
+    const chinese = (l.match(/[一-鿿]/g) || []).length;
+    score += chinese * 10;
+    // Penalize very short or very long
+    if (l.length >= 2 && l.length <= 20) score += 20;
+    else if (l.length >= 1 && l.length <= 30) score += 5;
+    else score -= 10;
+    // Penalize lines that are mostly numbers or punctuation
+    const alphaNum = (l.match(/[a-zA-Z0-9一-鿿]/g) || []).length;
+    if (alphaNum / l.length < 0.5) score -= 15;
+    return { text: l, score };
   });
-  if (candidates.length > 0) {
-    // Prefer lines with Chinese characters
-    const chinese = candidates.filter(l => /[一-鿿]/.test(l));
-    if (chinese.length > 0) return chinese[0].trim();
-    return candidates.sort((a, b) => b.length - a.length)[0].trim();
-  }
-  return lines[0].trim().substring(0, 30);
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].text;
 }
 
 // ============================================================
