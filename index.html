@@ -13,7 +13,7 @@
   <script>
   // Force clear old Service Worker caches when app version changes
   (function(){
-    var APP_V = 5;
+    var APP_V = 6;
     if (localStorage.getItem('_appV') !== String(APP_V)) {
       localStorage.setItem('_appV', String(APP_V));
       if ('serviceWorker' in navigator) {
@@ -31,7 +31,7 @@
     }
   })();
   </script>
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -117,6 +117,11 @@
           <div id="reading-garden" class="reading-garden"></div>
         </div>
 
+        <!-- Weekly Report Button -->
+        <div class="report-btn-section">
+          <button class="btn btn-report" onclick="showWeeklyReport()">📊 本周阅读周报</button>
+        </div>
+
         <!-- Today's Snapshot -->
         <div class="snapshot-section">
           <h3>📸 今日阅读快照</h3>
@@ -162,6 +167,14 @@
       </div>
     </div>
 
+    <!-- Weekly Report Screen -->
+    <div id="screen-weekly-report" class="screen">
+      <div class="container">
+        <button class="btn-back" onclick="showScreen('screen-dashboard')">← 返回</button>
+        <div id="weekly-report-content"></div>
+      </div>
+    </div>
+
     <!-- Custom Confirm Dialog -->
     <div id="confirm-dialog" class="confirm-dialog hidden">
       <div class="confirm-box">
@@ -195,6 +208,6 @@
   <!-- Confetti (local) -->
   <script src="vendor/confetti.browser.min.js"></script>
   <!-- App -->
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

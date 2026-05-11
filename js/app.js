@@ -1057,6 +1057,152 @@ async function importData(file) {
 }
 
 // ============================================================
+// Weekly Report
+// ============================================================
+async function showWeeklyReport() {
+  var now = new Date();
+  var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var dateEnd = formatReportDate(now);
+  var dateStart = formatReportDate(weekAgo);
+
+  var allData = [];
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    var uBooks;
+    if (firebaseReady) {
+      try {
+        var snap = await db.collection('users').doc(u.id).collection('books').orderBy('createdAt', 'desc').get();
+        uBooks = snap.docs.map(function(d) { return { id: d.id, name: d.data().name, createdAt: d.data().createdAt }; });
+      } catch (e) {
+        uBooks = JSON.parse(localStorage.getItem('books_' + u.id) || '[]');
+      }
+    } else {
+      uBooks = JSON.parse(localStorage.getItem('books_' + u.id) || '[]');
+    }
+    var weekBooks = uBooks.filter(function(b) {
+      return b.createdAt && new Date(b.createdAt) >= weekAgo;
+    });
+    allData.push({ user: u, weekBooks: weekBooks, totalBooks: uBooks.length });
+  }
+
+  var familyTotal = allData.reduce(function(s, d) { return s + d.weekBooks.length; }, 0);
+  var topReader = allData.slice().sort(function(a, b) { return b.weekBooks.length - a.weekBooks.length; })[0];
+
+  var html = '';
+  html += '<div class="report-header">';
+  html += '<h2>📊 本周阅读周报</h2>';
+  html += '<p class="report-date-range">' + dateStart + ' — ' + dateEnd + '</p>';
+  html += '</div>';
+
+  html += '<div class="report-family-summary">';
+  html += '<div class="report-family-total">' + familyTotal + '</div>';
+  html += '<div class="report-family-label">本周全家共读</div>';
+  html += '<div class="report-family-comment">' + generateFamilyComment(familyTotal, topReader) + '</div>';
+  html += '</div>';
+
+  for (var j = 0; j < allData.length; j++) {
+    var d = allData[j];
+    var color = d.user.color || '#6366f1';
+    html += '<div class="report-user-card" style="border-left-color:' + color + '">';
+    html += '<div class="report-user-header">';
+    html += '<div class="report-user-avatar" style="background:' + color + '">' + d.user.name[0] + '</div>';
+    html += '<div class="report-user-name">' + d.user.name + '</div>';
+    html += '<div class="report-user-count" style="color:' + color + '">' + d.weekBooks.length + ' <small>本/周</small></div>';
+    html += '</div>';
+
+    if (d.weekBooks.length > 0) {
+      html += '<div class="report-book-list">';
+      for (var k = 0; k < d.weekBooks.length; k++) {
+        html += '<span class="report-book-tag">' + BOOK_EMOJIS[k % BOOK_EMOJIS.length] + ' ' + d.weekBooks[k].name + '</span>';
+      }
+      html += '</div>';
+    } else {
+      html += '<p class="report-no-books">这周还没有阅读记录</p>';
+    }
+
+    html += '<div class="report-ai-comment">';
+    html += '<div class="report-ai-label">✨ AI 点评</div>';
+    html += generateAIComment(d.user.name, d.weekBooks, d.totalBooks);
+    html += '</div>';
+    html += '</div>';
+  }
+
+  document.getElementById('weekly-report-content').innerHTML = html;
+  showScreen('screen-weekly-report');
+}
+
+function formatReportDate(d) {
+  return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+}
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateFamilyComment(total, topData) {
+  var top = topData ? topData.user.name : '';
+  if (total === 0) return pickRandom([
+    '这周大家可能都在忙碌吧！没关系，阅读的种子已经种下，下周一起重新出发！💪',
+    '虽然这周没有新的阅读记录，但每个人心里都住着一个小书虫，下周让它醒来吧！🌱',
+    '休息是为了更好地出发！下周一起打开一本新书，开始新的冒险吧！📚'
+  ]);
+  if (total <= 2) return pickRandom([
+    '这周全家的阅读之旅已经启程！' + top + '带头翻开了新书，让我们一起为阅读点赞！👏',
+    '虽然数量不多，但每一本书都是一颗知识的种子。全家一起阅读，最温馨的时光！🌟',
+    top + '这周为家庭阅读开了一个好头！一起加油，下周争取更多精彩故事！📖'
+  ]);
+  if (total <= 5) return pickRandom([
+    '全家本周共读了' + total + '本书，阅读氛围越来越浓了！' + top + '表现最亮眼，为你点赞！🎉',
+    total + '本书，' + total + '次奇妙的旅程！这个家庭的阅读热情让人感动，继续保持！🌈',
+    '本周' + total + '本书的成绩很棒！每个人都在用自己的方式探索书的世界，这就是最好的家庭时光！💫'
+  ]);
+  return pickRandom([
+    '太厉害了！全家本周共读了' + total + '本书！' + top + '更是一马当先，你们就是「阅读之家」！🏆',
+    total + '本书！这个数字代表着满满的求知欲和好奇心。' + top + '这周特别给力，全家一起向阅读星球冲刺！🚀',
+    '不可思议的一周！' + total + '本书！每个家庭成员都在闪闪发光，你们是最棒的阅读家庭！✨'
+  ]);
+}
+
+function generateAIComment(name, weekBooks, totalBooks) {
+  var count = weekBooks.length;
+  var titles = weekBooks.map(function(b) { return b.name; });
+  var book1 = titles[0] || '';
+  var bookListStr = titles.length <= 3
+    ? titles.map(function(t) { return '《' + t + '》'; }).join('、')
+    : titles.slice(0, 2).map(function(t) { return '《' + t + '》'; }).join('、') + '等' + count + '本书';
+
+  if (count === 0) return pickRandom([
+    name + '这周虽然没有新的阅读记录，但之前已经积累了' + totalBooks + '本书的阅读量，非常了不起！每个小读者都有自己的节奏，下周我们继续加油！💪',
+    '这周' + name + '可能在忙别的精彩事情吧！已经读过' + totalBooks + '本书的你，阅读的种子早已种下。期待下周的阅读冒险！🌱',
+    name + '，休息也是成长的一部分哦！你已经是一个读了' + totalBooks + '本书的小小阅读家，下周翻开新书的时候，故事会更加精彩！📚'
+  ]);
+
+  if (count === 1) return pickRandom([
+    name + '这周读了《' + book1 + '》，每翻开一本新书都是打开一扇通往奇妙世界的大门！你的好奇心是最棒的超能力！✨',
+    '这周' + name + '和《' + book1 + '》来了一次美妙的邂逅！一本书就是一次冒险，你又多了一段精彩的故事回忆！🌈',
+    '《' + book1 + '》一定给' + name + '带来了很多新的想法吧！每读完一本书，你都在变得更加了不起！继续保持哦！⭐'
+  ]);
+
+  if (count <= 3) return pickRandom([
+    '哇！' + name + '这周读了' + count + '本书：' + bookListStr + '。你的阅读热情像小火箭一样势不可挡！每一本书都让你的世界变得更大更精彩！🚀',
+    name + '这周的阅读清单好丰富！' + count + '本书代表着' + count + '次奇妙的旅程。你是一个真正热爱阅读的小书虫，太棒了！📖',
+    '本周' + name + '完成了' + bookListStr + '的阅读。每一页都是知识的宝藏，你正在一步步成为阅读小达人！🏅'
+  ]);
+
+  if (count <= 6) return pickRandom([
+    '不可思议！' + name + '这周竟然读了' + count + '本书！你简直就是一台阅读小火车，在知识的轨道上飞速前进！🔥',
+    name + '，这周' + count + '本书的阅读量太惊人了！你对知识的热爱让你闪闪发光，继续这样下去，你会成为最棒的小读者！🏆',
+    '这周' + name + '像一只快乐的小蜜蜂，在' + count + '本书的花丛中采集知识的花蜜！你的勤奋和热爱让每个人都为你骄傲！🐝'
+  ]);
+
+  return pickRandom([
+    '天哪！' + name + '这周读了' + count + '本书，简直是阅读界的超级英雄！你对书的热爱已经超越了很多大人，未来不可限量！🦸',
+    name + '，' + count + '本书！你这周创造了一个了不起的纪录！你就是传说中的「读书小天才」！👑',
+    '一周' + count + '本！' + name + '，你简直是书海里的探险家！每一本书都被你收入囊中，你的知识宝库一定满满的了！🗺️'
+  ]);
+}
+
+// ============================================================
 // Service Worker
 // ============================================================
 if ('serviceWorker' in navigator) {
