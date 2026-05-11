@@ -509,30 +509,9 @@ async function editBook(bookId) {
 // ============================================================
 function showAddBook() {
   showScreen('screen-add-book');
-  document.getElementById('camera-section').classList.add('hidden');
-  document.getElementById('manual-section').classList.add('hidden');
-  document.getElementById('captured-preview').classList.add('hidden');
-}
-
-function showManualInput() {
-  // Hide camera section explicitly
-  document.getElementById('camera-section').style.display = 'none';
-  // Show manual section
-  const section = document.getElementById('manual-section');
-  section.style.display = 'block';
-  section.classList.remove('hidden');
-  const input = document.getElementById('input-book-name');
-  input.value = '';
-  // iOS: multiple fallback approaches for focus
-  input.blur(); // reset any existing focus state
-  setTimeout(() => {
-    input.focus();
-    // Force keyboard open on iOS
-    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-      const evt = new Event('touchstart');
-      input.dispatchEvent(evt);
-    }
-  }, 400);
+  document.getElementById('photo-preview').classList.add('hidden');
+  // Clear previous input
+  document.getElementById('input-book-name').value = '';
 }
 
 async function saveBookManual() {
@@ -542,10 +521,16 @@ async function saveBookManual() {
   document.getElementById('input-book-name').value = '';
 }
 
-async function saveBookFromOCR() {
-  const name = document.getElementById('ocr-book-name').value.trim();
-  if (!name) return alert('请确认书名');
-  await saveBook(name);
+function previewPhoto(file) {
+  if (!file) return;
+  const previewEl = document.getElementById('photo-preview');
+  const imgEl = document.getElementById('preview-img');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    imgEl.src = e.target.result;
+    previewEl.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
 }
 
 async function saveBook(name) {

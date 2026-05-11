@@ -954,6 +954,76 @@ h3 {
   color: #f59e0b;
 }
 
+/* Add Book Screen - Manual Input */
+.manual-input-main {
+  margin-bottom: 32px;
+}
+
+.manual-input-main input {
+  width: 100%;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 2px solid var(--user-color);
+  border-radius: 14px;
+  color: var(--text);
+  font-size: 1.15rem;
+  outline: none;
+  margin-bottom: 12px;
+  -webkit-appearance: none;
+}
+
+.manual-input-main input:focus {
+  border-color: var(--user-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.manual-input-main .btn {
+  margin-top: 4px;
+}
+
+/* Camera Helper (photo reference, no OCR) */
+.camera-helper {
+  text-align: center;
+}
+
+.option-card-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--text-muted);
+  border-radius: 12px;
+  padding: 14px 28px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.option-card-small:active {
+  transform: scale(0.96);
+  background: var(--surface-2);
+}
+
+#photo-preview {
+  margin-top: 16px;
+  text-align: center;
+}
+
+#photo-preview img {
+  width: 100%;
+  max-width: 320px;
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  border: 1px solid var(--surface-2);
+}
+
+.photo-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* User card delete button */
 .user-card {
   position: relative;

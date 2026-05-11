@@ -120,41 +120,23 @@
         <button class="btn-back" onclick="showScreen('screen-dashboard')">← 返回</button>
         <h2>记录一本书</h2>
 
-        <div class="add-book-options">
-          <div class="option-card" onclick="startCamera()">
-            <div class="option-icon">📷</div>
-            <p>拍照识别</p>
-            <span class="option-desc">拍书封面，自动识别书名</span>
-          </div>
-          <div class="option-card" onclick="showManualInput()">
-            <div class="option-icon">✏️</div>
-            <p>手动输入</p>
-            <span class="option-desc">直接输入书名</span>
-          </div>
+        <!-- Input always visible, front and center -->
+        <div class="manual-input-main">
+          <input type="text" id="input-book-name" placeholder="输入书名" autocomplete="off">
+          <button class="btn btn-primary" onclick="saveBookManual()">✅ 记录这本书</button>
         </div>
 
-        <!-- Camera Section (iOS-compatible file input) -->
-        <div id="camera-section" class="hidden">
+        <!-- Camera helper: take photo to read the title yourself -->
+        <div class="camera-helper">
           <input type="file" id="camera-file-input" accept="image/*" capture="environment"
-                 class="hidden" onchange="processImageFile(this.files[0]); this.value='';">
-          <div id="captured-preview" class="hidden">
-            <img id="captured-img" alt="captured">
-            <p id="ocr-status">正在识别...</p>
-            <div id="ocr-result" class="hidden">
-              <label>识别结果</label>
-              <input type="text" id="ocr-book-name" placeholder="书名">
-              <button class="btn btn-primary" onclick="saveBookFromOCR()">保存</button>
-            </div>
+                 class="hidden" onchange="previewPhoto(this.files[0]); this.value='';">
+          <div class="option-card-small" onclick="document.getElementById('camera-file-input').click()">
+            <span>📷</span> 拍照参考
           </div>
-        </div>
-
-        <!-- Manual Input Section -->
-        <div id="manual-section" class="hidden">
-          <div class="form-group">
-            <label>书名</label>
-            <input type="text" id="input-book-name" placeholder="输入书名">
+          <div id="photo-preview" class="hidden">
+            <img id="preview-img" alt="book cover">
+            <p class="photo-hint">看看封面，把书名输入上方输入框</p>
           </div>
-          <button class="btn btn-primary" onclick="saveBookManual()">保存</button>
         </div>
       </div>
     </div>
