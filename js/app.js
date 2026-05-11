@@ -26,35 +26,61 @@ let books = [];
 let selectedColor = '#6366f1';
 
 const USER_COLORS = [
-  '#6366f1', // indigo
-  '#ec4899', // pink
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#06b6d4', // cyan
-  '#8b5cf6', // violet
-  '#ef4444', // red
-  '#14b8a6', // teal
-  '#f97316', // orange
-  '#84cc16', // lime
+  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4',
+  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
 ];
 
 const BOOK_EMOJIS = ['📕', '📗', '📘', '📙', '📓', '📒', '📔', '📖'];
-const STAR_ANIMALS = ['🐱', '🐶', '🐰', '🦊', '🐼', '🦁', '🐸', '🦋', '🐠', '🦄'];
+const ADVENTURE_CHARS = ['🦊', '🐱', '🐶', '🐰', '🐼', '🦁', '🐸', '🦋', '🦄', '精灵', '宇航员'];
+const BOOK_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 // ============================================================
-// Toast notification
+// Toast notification (CSS animated)
 // ============================================================
 function showToast(message, duration = 2000) {
   let toast = document.getElementById('toast-msg');
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'toast-msg';
-    toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#fff;padding:16px 32px;border-radius:16px;font-size:1.1rem;z-index:99999;text-align:center;animation:bounceIn 0.4s ease;';
     document.body.appendChild(toast);
   }
   toast.textContent = message;
-  toast.style.display = 'block';
-  setTimeout(() => { toast.style.display = 'none'; }, duration);
+  toast.classList.remove('show');
+  // Force reflow
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, duration);
+}
+
+// ============================================================
+// Custom Confirm Dialog
+// ============================================================
+function showConfirm({ icon = '⚠️', title = '确认', message = '', confirmText = '确定', danger = true }) {
+  return new Promise(resolve => {
+    const dialog = document.getElementById('confirm-dialog');
+    document.getElementById('confirm-icon').textContent = icon;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    const okBtn = document.getElementById('confirm-ok');
+    const cancelBtn = document.getElementById('confirm-cancel');
+    okBtn.textContent = confirmText;
+    okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+    dialog.classList.remove('hidden');
+
+    function cleanup(result) {
+      dialog.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
 }
 
 // ============================================================
@@ -63,7 +89,37 @@ function showToast(message, duration = 2000) {
 function playCelebrationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+
+    // Happy ascending melody
+    const notes = [
+      { freq: 523.25, time: 0, dur: 0.15 },    // C5
+      { freq: 587.33, time: 0.12, dur: 0.15 },  // D5
+      { freq: 659.25, time: 0.24, dur: 0.15 },  // E5
+      { freq: 783.99, time: 0.36, dur: 0.2 },   // G5
+      { freq: 1046.50, time: 0.5, dur: 0.35 },  // C6
+    ];
+
+    notes.forEach(({ freq, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      const t = ctx.currentTime + time;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    });
+  } catch(e) { /* silent fail */ }
+}
+
+function playDeleteSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [440, 349.23, 293.66]; // A4, F4, D4 descending
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -71,12 +127,13 @@ function playCelebrationSound() {
       gain.connect(ctx.destination);
       osc.frequency.value = freq;
       osc.type = 'sine';
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.4);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.4);
+      const t = ctx.currentTime + i * 0.12;
+      gain.gain.setValueAtTime(0.2, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+      osc.start(t);
+      osc.stop(t + 0.25);
     });
-  } catch(e) { /* silent fail */ }
+  } catch(e) {}
 }
 
 // ============================================================
@@ -97,7 +154,6 @@ async function loadUsers() {
     renderUsers();
   } catch (e) {
     console.error('Load users failed:', e);
-    // Fallback to localStorage
     users = JSON.parse(localStorage.getItem('reading_users') || '[]');
     renderUsers();
   }
@@ -105,8 +161,12 @@ async function loadUsers() {
 
 function renderUsers() {
   const grid = document.getElementById('user-list');
+  if (users.length === 0) {
+    grid.innerHTML = '<p style="color:var(--text-muted);text-align:center;grid-column:1/-1;padding:20px;">还没有成员，添加一个吧！</p>';
+    return;
+  }
   grid.innerHTML = users.map(user => `
-    <div class="user-card" style="border-color: ${user.color}20">
+    <div class="user-card" style="border-color: ${user.color}30">
       <div class="user-card-main" onclick="selectUser('${user.id}')">
         <div class="avatar" style="background: ${user.color}">${user.name[0]}</div>
         <div class="name">${user.name}</div>
@@ -153,7 +213,6 @@ async function createUser() {
     const ref = await db.collection('users').add(userData);
     userData.id = ref.id;
   } catch (e) {
-    // Fallback: local ID
     userData.id = 'local_' + Date.now();
     const localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
     localUsers.push(userData);
@@ -164,28 +223,29 @@ async function createUser() {
   document.getElementById('input-username').value = '';
   showScreen('screen-users');
   renderUsers();
-  showToast('添加用户成功');
+  showToast('✅ 添加成功！');
 }
 
 async function selectUser(userId) {
   currentUser = users.find(u => u.id === userId);
   if (!currentUser) return;
-
-  // Apply user color
   document.documentElement.style.setProperty('--user-color', currentUser.color);
-
-  // Load books
   await loadBooks();
   renderDashboard();
   showScreen('screen-dashboard');
 }
 
 async function deleteUser(userId, userName) {
-  const confirmed = confirm(`确定要删除「${userName}」吗？\n该用户的所有阅读记录也会一并删除。`);
+  const confirmed = await showConfirm({
+    icon: '🗑️',
+    title: '删除成员',
+    message: `确定要删除「${userName}」吗？\n该用户的所有阅读记录也会一并删除，无法恢复。`,
+    confirmText: '删除',
+    danger: true
+  });
   if (!confirmed) return;
 
   try {
-    // Delete user's books subcollection
     const booksSnap = await db.collection('users').doc(userId).collection('books').get();
     const batch = db.batch();
     booksSnap.docs.forEach(doc => batch.delete(doc.ref));
@@ -195,15 +255,14 @@ async function deleteUser(userId, userName) {
     console.error('Firestore delete failed:', e);
   }
 
-  // Update local state
   users = users.filter(u => u.id !== userId);
   localStorage.removeItem(`books_${userId}`);
-  // Also clean up localStorage users list
   const localUsers = JSON.parse(localStorage.getItem('reading_users') || '[]');
   localStorage.setItem('reading_users', JSON.stringify(localUsers.filter(u => u.id !== userId)));
 
+  playDeleteSound();
   renderUsers();
-  showToast(`已删除「${userName}」`);
+  showToast('已删除「' + userName + '」');
 }
 
 // ============================================================
@@ -226,17 +285,19 @@ function renderDashboard() {
   document.getElementById('dash-count').textContent = `${count} 本`;
   document.getElementById('progress-number').textContent = count;
 
-  // Progress ring (target: next milestone)
+  // Progress ring
   let target = count < 50 ? 50 : (count < 100 ? 100 : Math.ceil(count / 50) * 50);
-  const progress = count / target;
-  const circumference = 2 * Math.PI * 85; // r=85
+  const progress = Math.min(count / target, 1);
+  const circumference = 2 * Math.PI * 85;
   const offset = circumference * (1 - progress);
   document.querySelector('.progress-ring-fill').style.strokeDashoffset = offset;
 
-  // Milestone text
   const remaining = target - count;
   document.getElementById('progress-milestone').textContent =
     remaining > 0 ? `距离 ${target} 本还差 ${remaining} 本 💪` : `🎉 已达成 ${target} 本目标！`;
+
+  // Visual adventure
+  renderAdventure();
 
   // Reading Garden
   renderReadingGarden();
@@ -280,6 +341,81 @@ function formatDate(dateStr) {
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
+// ============================================================
+// Visual Reading Adventure (for kids!)
+// ============================================================
+function renderAdventure() {
+  const count = books.length;
+  const scene = document.getElementById('adventure-scene');
+  const barFill = document.getElementById('adventure-bar-fill');
+  const barLabel = document.getElementById('adventure-bar-label');
+
+  // Progress bar
+  const maxBooks = 100;
+  const pct = Math.min((count / maxBooks) * 100, 100);
+  barFill.style.width = pct + '%';
+  barLabel.textContent = `${count} / ${maxBooks}`;
+
+  // Build scene
+  let html = '';
+
+  // Stars (always present)
+  const starCount = 15;
+  for (let i = 0; i < starCount; i++) {
+    const x = Math.random() * 100;
+    const y = Math.random() * 50;
+    const delay = Math.random() * 3;
+    const size = 2 + Math.random() * 3;
+    html += `<div class="adventure-star" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px;animation-delay:${delay}s"></div>`;
+  }
+
+  // Milestone flags
+  const milestones = [10, 25, 50, 75, 100];
+  const flagEmojis = ['🏁', '⭐', '🎆', '🌟', '🏆'];
+  milestones.forEach((m, i) => {
+    if (count >= m) {
+      const x = (m / maxBooks) * 90 + 5;
+      html += `<div class="milestone-flag" style="left:${x}%">${flagEmojis[i]}</div>`;
+    }
+  });
+
+  // Character position based on progress
+  const charX = Math.min((count / maxBooks) * 85 + 5, 90);
+  const charEmoji = ADVENTURE_CHARS[0]; // Default fox
+  html += `<div class="adventure-character" id="adv-char" style="left:${charX}%">${charEmoji}</div>`;
+
+  // Book tower next to character
+  if (count > 0) {
+    const towerBooks = Math.min(count, 20); // Show max 20 books in tower
+    let towerHtml = '';
+    for (let i = 0; i < towerBooks; i++) {
+      const color = BOOK_COLORS[i % BOOK_COLORS.length];
+      const w = 35 + Math.random() * 10;
+      towerHtml += `<div class="tower-book" style="width:${w}px;background:${color};animation-delay:${i * 0.05}s"></div>`;
+    }
+    html += `<div class="book-tower" style="left:calc(${charX}% + 30px)">${towerHtml}</div>`;
+  }
+
+  // Rocket at 100%
+  if (count >= 100) {
+    html += `<div class="adventure-rocket" style="right:10%;top:15%">🚀</div>`;
+  }
+
+  // Floating sparkles
+  if (count > 0) {
+    for (let i = 0; i < 3; i++) {
+      const x = charX + (Math.random() - 0.5) * 20;
+      const delay = i * 1;
+      html += `<div class="sparkle" style="left:${x}%;bottom:60%;animation-delay:${delay}s">✨</div>`;
+    }
+  }
+
+  scene.innerHTML = html;
+}
+
+// ============================================================
+// Add Book
+// ============================================================
 function showAddBook() {
   showScreen('screen-add-book');
   document.getElementById('camera-section').classList.add('hidden');
@@ -316,8 +452,6 @@ async function saveBook(name) {
     const ref = await db.collection('users').doc(currentUser.id)
       .collection('books').add(bookData);
     bookData.id = ref.id;
-
-    // Update user book count
     const newCount = books.length + 1;
     await db.collection('users').doc(currentUser.id).update({ bookCount: newCount });
     currentUser.bookCount = newCount;
@@ -330,16 +464,18 @@ async function saveBook(name) {
 
   books.unshift(bookData);
 
-  // Per-book mini celebration
+  // Celebration!
   launchMiniConfetti();
   playCelebrationSound();
 
   // Check milestones
   const count = books.length;
   if (count === 50) {
-    showCelebration50();
+    setTimeout(() => showCelebration50(), 600);
   } else if (count === 100) {
-    showCelebration100();
+    setTimeout(() => showCelebration100(), 600);
+  } else if ([10, 25, 75].includes(count)) {
+    showToast(`🎉 第 ${count} 本书！继续加油！`);
   }
 
   showScreen('screen-dashboard');
@@ -347,62 +483,81 @@ async function saveBook(name) {
 }
 
 // ============================================================
-// Camera & OCR (iOS-compatible file input)
+// Camera & OCR
 // ============================================================
 function startCamera() {
   document.getElementById('manual-section').classList.add('hidden');
   document.getElementById('camera-section').classList.remove('hidden');
   document.getElementById('captured-preview').classList.add('hidden');
-  // Trigger the hidden file input (opens native camera on iOS)
   document.getElementById('camera-file-input').click();
 }
 
 function processImageFile(file) {
   if (!file) return;
 
-  // Show preview
-  document.getElementById('btn-capture')?.classList.add('hidden');
   document.getElementById('captured-preview').classList.remove('hidden');
+  document.getElementById('ocr-status').textContent = '正在加载图片...';
+  document.getElementById('ocr-result').classList.add('hidden');
 
   const reader = new FileReader();
   reader.onload = function(e) {
     const dataUrl = e.target.result;
     document.getElementById('captured-img').src = dataUrl;
     document.getElementById('ocr-status').textContent = '正在识别书名...';
-    document.getElementById('ocr-result').classList.add('hidden');
     runOCR(dataUrl);
+  };
+  reader.onerror = function() {
+    document.getElementById('ocr-status').textContent = '图片加载失败，请重试';
   };
   reader.readAsDataURL(file);
 }
 
 async function runOCR(dataUrl) {
+  const statusEl = document.getElementById('ocr-status');
+  const resultEl = document.getElementById('ocr-result');
+  const nameInput = document.getElementById('ocr-book-name');
+
+  // Check if Tesseract is loaded
+  if (typeof Tesseract === 'undefined') {
+    statusEl.textContent = 'OCR 引擎未加载，请使用手动输入';
+    nameInput.value = '';
+    resultEl.classList.remove('hidden');
+    return;
+  }
+
   try {
+    statusEl.textContent = '正在初始化 OCR 引擎...';
+
     const result = await Tesseract.recognize(dataUrl, 'chi_sim+eng', {
       logger: m => {
         if (m.status === 'recognizing text') {
-          document.getElementById('ocr-status').textContent =
-            `识别中... ${Math.round(m.progress * 100)}%`;
+          statusEl.textContent = `识别中... ${Math.round(m.progress * 100)}%`;
+        } else if (m.status === 'loading language traineddata') {
+          statusEl.textContent = '正在加载语言包...';
         }
       }
     });
 
     const text = result.data.text.trim();
-    document.getElementById('ocr-status').textContent = '识别完成，请确认书名：';
-    document.getElementById('ocr-book-name').value = extractBookName(text);
-    document.getElementById('ocr-result').classList.remove('hidden');
+    if (text.length > 0) {
+      statusEl.textContent = '识别完成，请确认书名：';
+      nameInput.value = extractBookName(text);
+    } else {
+      statusEl.textContent = '未识别到文字，请手动输入书名：';
+      nameInput.value = '';
+    }
+    resultEl.classList.remove('hidden');
   } catch (e) {
-    document.getElementById('ocr-status').textContent = '识别失败，请手动输入';
-    document.getElementById('ocr-book-name').value = '';
-    document.getElementById('ocr-result').classList.remove('hidden');
+    console.error('OCR error:', e);
+    statusEl.textContent = '识别出错，请手动输入书名：';
+    nameInput.value = '';
+    resultEl.classList.remove('hidden');
   }
 }
 
 function extractBookName(ocrText) {
-  // Try to extract the most prominent text (usually the title)
   const lines = ocrText.split('\n').filter(l => l.trim().length > 0);
-  // Usually the book title is the longest or most prominent line
   if (lines.length === 0) return '';
-  // Sort by length, take the longest reasonable one (2-20 chars likely a title)
   const candidates = lines.filter(l => l.trim().length >= 2 && l.trim().length <= 30);
   if (candidates.length > 0) {
     return candidates.sort((a, b) => b.length - a.length)[0].trim();
@@ -411,17 +566,43 @@ function extractBookName(ocrText) {
 }
 
 // ============================================================
+// Reading Garden (flower for every 5 books)
+// ============================================================
+function renderReadingGarden() {
+  const garden = document.getElementById('reading-garden');
+  const count = books.length;
+  const flowerCount = Math.floor(count / 5);
+
+  if (flowerCount === 0) {
+    garden.innerHTML = '<p class="empty-hint">每读 5 本书，花园里会开出一朵花 🌱</p>';
+    return;
+  }
+
+  const flowers = ['🌸', '🌺', '🌻', '🌹', '🌷', '💐', '🌼', '🏵️'];
+  let html = '';
+  for (let i = 0; i < flowerCount; i++) {
+    const flower = flowers[i % flowers.length];
+    const size = 1.5 + Math.random() * 0.8;
+    const rotate = Math.random() * 30 - 15;
+    html += `<span style="font-size:${size}rem;display:inline-block;transform:rotate(${rotate}deg);margin:4px">${flower}</span>`;
+  }
+  html += `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:8px">已读 ${count} 本书，花园里有 ${flowerCount} 朵花</p>`;
+  garden.innerHTML = html;
+}
+
+// ============================================================
 // Celebrations
 // ============================================================
 function launchMiniConfetti() {
   confetti({
-    particleCount: 40,
-    spread: 70,
-    origin: { y: 0.7 },
-    colors: [currentUser.color, '#ffd700', '#ff6b6b', '#48bb78'],
-    ticks: 80,
-    gravity: 1.2,
-    scalar: 0.8
+    particleCount: 60,
+    spread: 80,
+    origin: { y: 0.65 },
+    colors: [currentUser.color, '#ffd700', '#ff6b6b', '#48bb78', '#fff'],
+    ticks: 100,
+    gravity: 1,
+    scalar: 0.9,
+    shapes: ['circle', 'square']
   });
 }
 
@@ -432,9 +613,8 @@ function showCelebration50() {
   document.getElementById('celebration-message').textContent =
     `${currentUser.name}已经读了50本书，你是一颗闪亮的阅读之星！`;
   overlay.classList.remove('hidden');
-
-  // Fire confetti
   launchConfetti();
+  playCelebrationSound();
 }
 
 function showCelebration100() {
@@ -444,80 +624,33 @@ function showCelebration100() {
   document.getElementById('celebration-message').textContent =
     `${currentUser.name}读完了100本书！你是真正的阅读冠军！🌟`;
   overlay.classList.remove('hidden');
-
-  // Epic confetti
   launchEpicConfetti();
+  // Double celebration sound
+  playCelebrationSound();
+  setTimeout(playCelebrationSound, 400);
 }
 
 function launchConfetti() {
   const duration = 3000;
   const end = Date.now() + duration;
-
   (function frame() {
-    confetti({
-      particleCount: 3,
-      angle: 60,
-      spread: 55,
-      origin: { x: 0 },
-      colors: [currentUser.color, '#ffd700', '#ff6b6b']
-    });
-    confetti({
-      particleCount: 3,
-      angle: 120,
-      spread: 55,
-      origin: { x: 1 },
-      colors: [currentUser.color, '#ffd700', '#ff6b6b']
-    });
-
+    confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0 }, colors: [currentUser.color, '#ffd700', '#ff6b6b'] });
+    confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1 }, colors: [currentUser.color, '#ffd700', '#ff6b6b'] });
     if (Date.now() < end) requestAnimationFrame(frame);
   })();
 }
 
 function launchEpicConfetti() {
-  // Big burst
-  confetti({
-    particleCount: 150,
-    spread: 100,
-    origin: { y: 0.6 },
-    colors: [currentUser.color, '#ffd700', '#ff6b6b', '#48bb78', '#4299e1']
-  });
-
-  // Continuous stream
+  confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 }, colors: [currentUser.color, '#ffd700', '#ff6b6b', '#48bb78', '#4299e1'] });
   const duration = 5000;
   const end = Date.now() + duration;
-
   (function frame() {
-    confetti({
-      particleCount: 5,
-      angle: 60,
-      spread: 80,
-      origin: { x: 0, y: 0.7 },
-      colors: ['#ffd700', currentUser.color]
-    });
-    confetti({
-      particleCount: 5,
-      angle: 120,
-      spread: 80,
-      origin: { x: 1, y: 0.7 },
-      colors: ['#ffd700', currentUser.color]
-    });
-
+    confetti({ particleCount: 6, angle: 60, spread: 80, origin: { x: 0, y: 0.7 }, colors: ['#ffd700', currentUser.color] });
+    confetti({ particleCount: 6, angle: 120, spread: 80, origin: { x: 1, y: 0.7 }, colors: ['#ffd700', currentUser.color] });
     if (Date.now() < end) requestAnimationFrame(frame);
   })();
-
-  // Stars
   setTimeout(() => {
-    confetti({
-      particleCount: 50,
-      spread: 360,
-      ticks: 100,
-      gravity: 0.2,
-      decay: 0.94,
-      startVelocity: 20,
-      shapes: ['star'],
-      colors: ['#ffd700', '#fff'],
-      origin: { x: 0.5, y: 0.3 }
-    });
+    confetti({ particleCount: 80, spread: 360, ticks: 100, gravity: 0.2, decay: 0.94, startVelocity: 20, shapes: ['star'], colors: ['#ffd700', '#fff'], origin: { x: 0.5, y: 0.3 } });
   }, 1000);
 }
 
@@ -526,7 +659,7 @@ function closeCelebration() {
 }
 
 // ============================================================
-// Service Worker Registration
+// Service Worker
 // ============================================================
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW reg failed:', e));
